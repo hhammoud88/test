@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maro Business</title>
+    <style>
+        /* Your existing styles here */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Maro&Ali Business</h1>
+        <button onclick="window.location.href='manage_sellers.html'">Manage Sellers</button>
+        <button onclick="window.location.href='manage_buyers.html'">Manage Buyers</button>
+        <form id="transaction-form">
+            <div class="form-group">
+                <label for="seller">Seller:</label>
+                <select id="seller">
+                    <option value="">None</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="buyer">Buyer:</label>
+                <select id="buyer">
+                    <option value="">None</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="date">Date:</label>
+                <input type="date" id="date">
+            </div>
+            <div class="form-group">
+                <label for="amount">Amount:</label>
+                <input type="number" id="amount" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="type">Type:</label>
+                <select id="type">
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="delivery-fee">Delivery Fee:</label>
+                <input type="checkbox" id="delivery-fee">
+            </div>
+            <button type="submit">Add Transaction</button>
+        </form>
+
+        <h2>Transactions</h2>
+        <table id="transactions-table">
+            <thead>
+                <tr>
+                    <th onclick="sortTransactions('seller')">Seller</th>
+                    <th onclick="sortTransactions('buyer')">Buyer</th>
+                    <th onclick="sortTransactions('date')">Date</th>
+                    <th onclick="sortTransactions('amount')">Amount</th>
+                    <th onclick="sortTransactions('type')">Type</th>
+                    <th>Delivery Fee</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <h2>Summary</h2>
+        <p>Initial Fee: $<span id="initial-fee">200.00</span></p>
+        <p>Total Transaction Count: <span id="total-count">0</span></p>
+        <p>Total Income: $<span id="total-income">0.00</span></p>
+        <p>Total Expenses: $<span id="total-expenses">0.00</span></p>
+        <p>Total Delivery Fees: $<span id="total-delivery-fees">0.00</span></p>
+    </div>
+    <div id="net-balance" class="net-balance">Net Balance: $0.00</div>
+
+    <!-- Add Firebase scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-database.js"></script>
+
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let transactions = [];
+
+        const form = document.getElementById('transaction-form');
+        const transactionsTable = document.getElementById('transactions-table').getElementsByTagName('tbody')[0];
+        const totalCountElement = document.getElementById('total-count');
+        const totalIncomeElement = document.getElementById('total-income');
+        const totalExpensesElement = document.getElementById('total-expenses');
+        const netBalanceElement = document.getElementById('net-balance');
+
+        function saveTransaction(transaction) {
+            const transactionsRef = database.ref('transactions');
+            transactionsRef.push(transaction);
+        }
+
+        function loadTransactions() {
+            const transactionsRef = database.ref('transactions');
+            transactionsRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                transactions = [];
+                for (const id in data) {
+                    transactions.push(data[id]);
+                }
+                updateTable();
+                updateSummary();
+            });
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const transaction = {
+                seller: document.getElementById('seller').value || 'N/A',
+                buyer: document.getElementById('buyer').value || 'N/A',
+                date: document.getElementById('date').value || 'N/A',
+                amount: parseFloat(document.getElementById('amount').value) || 0,
+                type: document.getElementById('type').value || 'N/A',
+                deliveryFee: document.getElementById('delivery-fee').checked
+            };
+            saveTransaction(transaction);
+            updateTable();
+            updateSummary();
+            form.reset();
+        });
+
+        function updateTable() {
+            transactionsTable.innerHTML = '';
+            transactions.forEach((transaction, index) => {
+                const row = transactionsTable.insertRow();
+                row.className = transaction.type === 'income' ? 'income-row' : 'expense-row';
+                row.insertCell(0).textContent = transaction.seller;
+                row.insertCell(1).textContent = transaction.buyer;
+                row.insertCell(2).textContent = transaction.date;
+                row.insertCell(3).textContent = '$' + transaction.amount.toFixed(2);
+                row.insertCell(4).textContent = transaction.type;
+                row.insertCell(5).textContent = transaction.deliveryFee ? '$2.00' : '$0.00';
+                const actionsCell = row.insertCell(6);
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Edit';
+                editButton.className = 'edit-button';
+                editButton.onclick = function() {
+                    document.getElementById('seller').value = transaction.seller;
+                    document.getElementById('buyer').value = transaction.buyer;
+                    document.getElementById('date').value = transaction.date;
+                    document.getElementById('amount').value = transaction.amount;
+                    document.getElementById('type').value = transaction.type;
+                    document.getElementById('delivery-fee').checked = transaction.deliveryFee;
+                    transactions.splice(index, 1);
+                    saveTransaction(transactions);
+                    updateTable();
+                    updateSummary();
+                };
+                actionsCell.appendChild(editButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.className = 'delete-button';
+                deleteButton.onclick = function() {
+                    transactions.splice(index, 1);
+                    saveTransaction(transactions);
+                    updateTable();
+                    updateSummary();
+                };
+                actionsCell.appendChild(deleteButton);
+            });
+        }
+
+        function updateSummary() {
+            const initialFee = 200;
+            const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+            const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+            const totalDeliveryFees = transactions.filter(t => t.deliveryFee).length * 2.00;
+            const netBalance = initialFee + totalIncome - totalExpenses - totalDeliveryFees;
+
+            totalCountElement.textContent = transactions.length;
+            totalIncomeElement.textContent = totalIncome.toFixed(2);
+            totalExpensesElement.textContent = totalExpenses.toFixed(2);
+            document.getElementById('total-delivery-fees').textContent = totalDeliveryFees.toFixed(2);
+            netBalanceElement.textContent = 'Net Balance: $' + netBalance.toFixed(2);
+        }
+
+        function sortTransactions(key) {
+            const sortOrder = transactions.sortOrder || 'asc';
+            transactions.sort((a, b) => {
+                if (a[key] < b[key]) return sortOrder === 'asc' ? -1 : 1;
+                if (a[key] > b[key]) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+            transactions.sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            updateTable();
+        }
+
+        loadTransactions();
+    </script>
+</body>
+</html>
